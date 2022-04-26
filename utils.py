@@ -8,6 +8,8 @@ def play(player1, player2, episodes=5, debug=False):
     player2_stats = {'wins': 0, 'losses': 0, 'M': 0}
 
     for i in range(episodes):
+        if debug:
+            print(f"Game {i}")
         env.reset()
         grid, _, __ = env.observe()
         Turns = Turns[np.random.permutation(2)]

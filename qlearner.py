@@ -32,6 +32,7 @@ class QPlayer:
         self.player = player # 'X' or 'O'
         self.qvalues = defaultdict(int)
         self.last_qstate = None
+        self.last_reward = 0
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
@@ -67,47 +68,60 @@ class QPlayer:
         
         return best_qstate
 
-    def simulate(self, grid, action):
-        '''simulate action to determine reward and next state'''
+    def play(self, grid, action, player):
         env = TictactoeEnv()
         env.grid = grid
-        env.current_player = self.player
-        next_grid, end, winner = env.step(action)
-        reward = 0
+        env.current_player = player
+        return env.step(action)
 
-        if end:
-            if winner == self.player:
-                reward = 1
-            else:
-                reward = -1
+    def get_opponent_player(self):
+        return 'X' if self.player == 'O' else 'O'
+
+    def simulate(self, grid, action):
+        '''simulate action to determine reward and next state'''
+        next_grid, end, winner = self.play(grid, action, self.player)
+
+        if end and winner == self.player:
+            return next_grid, end, 1
+
+        opponent_actions = self.empty(next_grid)
+        opponent = self.get_opponent_player()
+
+        for action in opponent_actions:
+            _, end, winner = self.play(next_grid, action, opponent)
+
+            if end and winner == opponent:
+                return next_grid, end, -1
         
-        return next_grid, end, reward
+        return next_grid, False, 0
 
     def act(self, grid, **kwargs):
         next_qstate = self.greedy(grid)
 
         if random.random() < self.epsilon:
-            print("Playing random")
+            # print("Playing random")
             qstate = self.random(grid)
         else:
-            print("Playing greedy")
+            # print("Playing greedy")
             qstate = next_qstate
 
-        print("Current qstate:")
-        print_qstate(qstate)
+        # print("Current qstate:")
+        # print_qstate(qstate)
 
         _, end, reward = self.simulate(grid, qstate.action)
-        print(f"Simulation: {end=}, {reward=}")
+        # print(f"Simulation: {end=}, {reward=}")
+
+        if self.last_qstate:
+            self.qvalues[self.last_qstate] += self.alpha * (self.last_reward + self.gamma * self.qvalues[next_qstate] - self.qvalues[self.last_qstate])
 
         if end:
             self.qvalues[qstate] += self.alpha * (reward - self.qvalues[qstate])
             self.last_qstate = None
         else:
-            if self.last_qstate:
-                self.qvalues[self.last_qstate] += self.alpha * (reward + self.gamma * self.qvalues[next_qstate] - self.qvalues[self.last_qstate])
             self.last_qstate = qstate
 
-        print("Current qvalues:")
-        print(self.qvalues)
-        print("\n")
+        self.last_reward = reward
+        # print("Current qvalues:")
+        # print(self.qvalues)
+        # print("\n")
         return qstate.action
