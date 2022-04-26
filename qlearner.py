@@ -70,7 +70,7 @@ class QPlayer:
 
     def play(self, grid, action, player):
         env = TictactoeEnv()
-        env.grid = grid
+        env.grid = grid.copy()
         env.current_player = player
         return env.step(action)
 
@@ -87,8 +87,8 @@ class QPlayer:
         opponent_actions = self.empty(next_grid)
         opponent = self.get_opponent_player()
 
-        for action in opponent_actions:
-            _, end, winner = self.play(next_grid, action, opponent)
+        for op_action in opponent_actions:
+            _, end, winner = self.play(next_grid, op_action, opponent)
 
             if end and winner == opponent:
                 return next_grid, end, -1
@@ -96,14 +96,14 @@ class QPlayer:
         return next_grid, False, 0
 
     def act(self, grid, **kwargs):
-        next_qstate = self.greedy(grid)
+        greedy_qstate = self.greedy(grid)
 
         if random.random() < self.epsilon:
             # print("Playing random")
             qstate = self.random(grid)
         else:
             # print("Playing greedy")
-            qstate = next_qstate
+            qstate = greedy_qstate
 
         # print("Current qstate:")
         # print_qstate(qstate)
@@ -112,7 +112,7 @@ class QPlayer:
         # print(f"Simulation: {end=}, {reward=}")
 
         if self.last_qstate:
-            self.qvalues[self.last_qstate] += self.alpha * (self.last_reward + self.gamma * self.qvalues[next_qstate] - self.qvalues[self.last_qstate])
+            self.qvalues[self.last_qstate] += self.alpha * (self.last_reward + self.gamma * self.qvalues[greedy_qstate] - self.qvalues[self.last_qstate])
 
         if end:
             self.qvalues[qstate] += self.alpha * (reward - self.qvalues[qstate])

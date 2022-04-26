@@ -9,7 +9,8 @@ def play(player1, player2, episodes=5, debug=False):
 
     for i in range(episodes):
         if debug:
-            print(f"Game {i}")
+            print('-------------------------------------------')
+            print(f"Game {i}, Player 1 = {Turns[0]}, Player 2 = {Turns[1]}")
         env.reset()
         grid, _, __ = env.observe()
         Turns = Turns[np.random.permutation(2)]
@@ -38,6 +39,7 @@ def play(player1, player2, episodes=5, debug=False):
                     print('Player 1 = ' +  Turns[0])
                     print('Player 2 = ' +  Turns[1])
                     env.render()
+                    print('-------------------------------------------')
                 
                 break
     
