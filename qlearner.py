@@ -36,6 +36,8 @@ class QPlayer:
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
+        self.last_qstate = None
+        self.last_reward = 0
         if j != -1:
             self.player = 'X' if j % 2 == 0 else 'O'
 
@@ -74,7 +76,7 @@ class QPlayer:
         env.current_player = player
         return env.step(action)
 
-    def get_opponent_player(self):
+    def opponent(self):
         return 'X' if self.player == 'O' else 'O'
 
     def simulate(self, grid, action):
@@ -85,7 +87,7 @@ class QPlayer:
             return next_grid, end, 1
 
         opponent_actions = self.empty(next_grid)
-        opponent = self.get_opponent_player()
+        opponent = self.opponent()
 
         for op_action in opponent_actions:
             _, end, winner = self.play(next_grid, op_action, opponent)
@@ -116,10 +118,8 @@ class QPlayer:
 
         if end:
             self.qvalues[qstate] += self.alpha * (reward - self.qvalues[qstate])
-            self.last_qstate = None
-        else:
-            self.last_qstate = qstate
 
+        self.last_qstate = qstate
         self.last_reward = reward
         # print("Current qvalues:")
         # print(self.qvalues)
