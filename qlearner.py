@@ -9,13 +9,14 @@ class QState:
     def __init__(self, grid: np.ndarray, action: Union[int, Tuple[int, int]]):
         self.grid = grid
         self.state = tuple(grid.ravel().tolist())
+        self.altstate = tuple((-grid).ravel().tolist())
         self.action = action
 
     def __hash__(self) -> int:
-        return hash((self.state, self.action))
+        return hash((self.state, self.action)) + hash((self.altstate, self.action))
     
     def __eq__(self, other) -> bool:
-        return isinstance(other, QState) and self.state == other.state and self.action == other.action
+        return isinstance(other, QState) and (self.state == other.state or self.state == other.altstate) and self.action == other.action
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
@@ -71,6 +72,7 @@ class QPlayer:
         return best_qstate
 
     def play(self, grid, action, player):
+        '''play one action'''
         env = TictactoeEnv()
         env.grid = grid.copy()
         env.current_player = player
@@ -83,12 +85,14 @@ class QPlayer:
         '''simulate action to determine reward and next state'''
         next_grid, end, winner = self.play(grid, action, self.player)
 
+        # if self wins then reward is 1
         if end and winner == self.player:
             return next_grid, end, 1
 
         opponent_actions = self.empty(next_grid)
         opponent = self.opponent()
 
+        # if opponent can win after my action, reward is -1
         for op_action in opponent_actions:
             _, end, winner = self.play(next_grid, op_action, opponent)
 
@@ -118,10 +122,17 @@ class QPlayer:
 
         if end:
             self.qvalues[qstate] += self.alpha * (reward - self.qvalues[qstate])
-
-        self.last_qstate = qstate
+            self.last_qstate = None
+        else:
+            self.last_qstate = qstate
         self.last_reward = reward
         # print("Current qvalues:")
         # print(self.qvalues)
         # print("\n")
+        # if reward == -1 and self.qvalues[qstate] != 0:
+        #     print_qstate(qstate)
+        #     print(f'qvalue={self.qvalues[qstate]}')
+        #     print(self.qvalues)
+        #     print('\n')
+
         return qstate.action

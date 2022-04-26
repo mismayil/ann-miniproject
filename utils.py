@@ -8,14 +8,15 @@ def play(player1, player2, episodes=5, debug=False):
     player2_stats = {'wins': 0, 'losses': 0, 'M': 0}
 
     for i in range(episodes):
-        if debug:
-            print('-------------------------------------------')
-            print(f"Game {i}, Player 1 = {Turns[0]}, Player 2 = {Turns[1]}")
         env.reset()
         grid, _, __ = env.observe()
         Turns = Turns[np.random.permutation(2)]
         player1.set_player(Turns[0])
         player2.set_player(Turns[1])
+
+        if debug:
+            print('-------------------------------------------')
+            print(f"Game {i}, Player 1 = {Turns[0]}, Player 2 = {Turns[1]}")
 
         for j in range(9):
             if env.current_player == player1.player:
