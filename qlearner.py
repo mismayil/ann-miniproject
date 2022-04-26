@@ -1,10 +1,13 @@
+from typing import Union, Tuple
 import random
 from collections import defaultdict
 import numpy as np
 from tic_env import TictactoeEnv
+from utils import print_qstate
 
 class QState:
-    def __init__(self, grid: np.ndarray, action: int):
+    def __init__(self, grid: np.ndarray, action: Union[int, Tuple[int, int]]):
+        self.grid = grid
         self.state = tuple(grid.ravel().tolist())
         self.action = action
 
@@ -28,16 +31,17 @@ class QPlayer:
         self.gamma = gamma
         self.player = player # 'X' or 'O'
         self.qvalues = defaultdict(int)
+        self.last_qstate = None
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
         if j != -1:
             self.player = 'X' if j % 2 == 0 else 'O'
 
-    def randomMove(self, grid):
-        """ Chose a random move from the available options. """
+    def random(self, grid):
+        """ Chose a random action from the available options. """
         avail = self.empty(grid)
-        return avail[random.randint(0, len(avail)-1)]
+        return QState(grid, avail[random.randint(0, len(avail)-1)])
 
     def empty(self, grid):
         '''return all empty positions'''
@@ -63,29 +67,47 @@ class QPlayer:
         
         return best_qstate
 
-    def simulate_action(self, grid, action):
+    def simulate(self, grid, action):
         '''simulate action to determine reward and next state'''
         env = TictactoeEnv()
         env.grid = grid
         env.current_player = self.player
         next_grid, end, winner = env.step(action)
-        
+        reward = 0
+
         if end:
             if winner == self.player:
-                return next_grid, 1
-            return next_grid, -1
+                reward = 1
+            else:
+                reward = -1
         
-        return next_grid, 0
+        return next_grid, end, reward
 
     def act(self, grid, **kwargs):
-        # whether move in random or not
+        next_qstate = self.greedy(grid)
+
         if random.random() < self.epsilon:
-            return self.randomMove(grid)
+            print("Playing random")
+            qstate = self.random(grid)
+        else:
+            print("Playing greedy")
+            qstate = next_qstate
 
-        qstate = self.greedy(grid)
-        next_grid, reward = self.simulate_action(grid, qstate.action)
-        next_qstate = self.greedy(next_grid)
+        print("Current qstate:")
+        print_qstate(qstate)
 
-        self.qvalues[qstate] += self.alpha * (reward + self.gamma * self.qvalues[next_qstate] - self.qvalues[qstate])
+        _, end, reward = self.simulate(grid, qstate.action)
+        print(f"Simulation: {end=}, {reward=}")
 
+        if end:
+            self.qvalues[qstate] += self.alpha * (reward - self.qvalues[qstate])
+            self.last_qstate = None
+        else:
+            if self.last_qstate:
+                self.qvalues[self.last_qstate] += self.alpha * (reward + self.gamma * self.qvalues[next_qstate] - self.qvalues[self.last_qstate])
+            self.last_qstate = qstate
+
+        print("Current qvalues:")
+        print(self.qvalues)
+        print("\n")
         return qstate.action

@@ -4,8 +4,8 @@ from tic_env import TictactoeEnv
 def play(player1, player2, episodes=5, debug=False):
     env = TictactoeEnv()
     Turns = np.array(['X','O'])
-    player1_stats = {'wins': 0, 'losses': 0}
-    player2_stats = {'wins': 0, 'losses': 0}
+    player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
+    player2_stats = {'wins': 0, 'losses': 0, 'M': 0}
 
     for i in range(episodes):
         env.reset()
@@ -39,4 +39,13 @@ def play(player1, player2, episodes=5, debug=False):
                 
                 break
     
+    player1_stats['M'] = (player1_stats['wins'] - player1_stats['losses']) / episodes
+    player2_stats['M'] = (player2_stats['wins'] - player2_stats['losses']) / episodes
     return player1_stats, player2_stats
+
+
+def print_qstate(qstate):
+    env = TictactoeEnv()
+    env.grid = qstate.grid
+    env.render()
+    print(f"Next action: {qstate.action}")
