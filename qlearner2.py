@@ -2,8 +2,6 @@ from typing import Union, Tuple
 import random
 from collections import defaultdict
 import numpy as np
-from tic_env import TictactoeEnv
-from utils import print_qstate
 
 class QState:
     def __init__(self, grid: np.ndarray, action: Union[int, Tuple[int, int]]):
@@ -24,7 +22,7 @@ class QState:
         return f"state={self.state}, action={self.action}"
 
 
-class QPlayer:
+class QPlayer2:
     def __init__(self, epsilon=0.2, alpha=0.05, gamma=0.99, player='X'):
         self.epsilon = epsilon
         self.alpha = alpha
@@ -70,35 +68,20 @@ class QPlayer:
         
         return best_qstate
 
-    def play(self, grid, action, player):
-        '''play one action'''
-        env = TictactoeEnv()
-        env.grid = grid.copy()
-        env.current_player = player
-        return env.step(action)
-
     def opponent(self):
         return 'X' if self.player == 'O' else 'O'
 
-    def simulate(self, grid, action):
-        '''simulate action to determine reward and next state'''
-        next_grid, end, winner = self.play(grid, action, self.player)
+    def end(self, winner):
+        reward = 0
 
-        # if self wins then reward is 1
-        if end and winner == self.player:
-            return next_grid, end, 1
+        if winner == self.player:
+            reward = 1
+        elif winner == self.opponent():
+            reward = -1
 
-        opponent_actions = self.empty(next_grid)
-        opponent = self.opponent()
+        self.qvalues[self.last_qstate] += self.alpha * (reward - self.qvalues[self.last_qstate])
 
-        # if opponent can win after my action, reward is -1
-        for op_action in opponent_actions:
-            _, end, winner = self.play(next_grid, op_action, opponent)
-
-            if end and winner == opponent:
-                return next_grid, end, -1
-        
-        return next_grid, False, 0
+        self.last_qstate = None
 
     def act(self, grid, **kwargs):
         greedy_qstate = self.greedy(grid)
@@ -108,16 +91,9 @@ class QPlayer:
         else:
             qstate = greedy_qstate
 
-        _, end, reward = self.simulate(grid, qstate.action)
-
         if self.last_qstate:
-            self.qvalues[self.last_qstate] += self.alpha * (self.last_reward + self.gamma * self.qvalues[greedy_qstate] - self.qvalues[self.last_qstate])
+            self.qvalues[self.last_qstate] += self.alpha * (self.gamma * self.qvalues[greedy_qstate] - self.qvalues[self.last_qstate])
 
-        if end:
-            self.qvalues[qstate] += self.alpha * (reward - self.qvalues[qstate])
-            self.last_qstate = None
-        else:
-            self.last_qstate = qstate
-        self.last_reward = reward
+        self.last_qstate = qstate
 
         return qstate.action
