@@ -8,7 +8,7 @@ METHOD_Q = "method-q"
 METHOD_SARSA = "method-sarsa"
 METHOD_EXP_SARSA = "method-exp-sarsa"
 
-class QState:
+class QStateAction:
     def __init__(self, grid: np.ndarray, action: Union[int, Tuple[int, int]]):
         self.grid = grid
         self.state = tuple(grid.ravel().tolist())
@@ -18,7 +18,7 @@ class QState:
         return hash((self.state, self.action))
     
     def __eq__(self, other) -> bool:
-        return isinstance(other, QState) and (self.state == other.state) and self.action == other.action
+        return isinstance(other, QStateAction) and (self.state == other.state) and self.action == other.action
 
     def __ne__(self, other) -> bool:
         return not self.__eq__(other)
@@ -49,7 +49,7 @@ class TDPlayer:
     def random(self, grid):
         """ Chose a random action from the available options. """
         avail = self.empty(grid)
-        return QState(grid, avail[random.randint(0, len(avail)-1)])
+        return QStateAction(grid, avail[random.randint(0, len(avail)-1)])
 
     def empty(self, grid):
         '''return all empty positions'''
@@ -67,7 +67,7 @@ class TDPlayer:
         max_qvalue = None
 
         for action in actions:
-            qstate = QState(grid, action)
+            qstate = QStateAction(grid, action)
             qvalue = self.qvalues.get(qstate, 0)
             if max_qvalue is None or qvalue > max_qvalue:
                 max_qvalue = qvalue

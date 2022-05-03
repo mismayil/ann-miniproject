@@ -3,6 +3,10 @@ import numpy as np
 import random
 
 
+class InvalidMoveError(Exception):
+    pass
+
+
 class TictactoeEnv:
     '''
     Description:
@@ -58,9 +62,9 @@ class TictactoeEnv:
         elif type(position) is not tuple:
             position = tuple(position)
         if self.grid[position] != 0:
-            raise ValueError('There is already a chess on position {}.'.format(position))
+            raise InvalidMoveError('There is already a piece on position {}.'.format(position))
 
-        # place a chess on the position
+        # place a piece on the position
         self.grid[position] = self.player2value[self.current_player]
         # update
         self.num_step += 1

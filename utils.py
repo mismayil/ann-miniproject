@@ -1,5 +1,6 @@
 import numpy as np
-from tic_env import TictactoeEnv
+from tic_env import TictactoeEnv, InvalidMoveError
+
 
 def play(player1, player2, episodes=5, debug=False):
     env = TictactoeEnv()
@@ -24,7 +25,12 @@ def play(player1, player2, episodes=5, debug=False):
             else:
                 move = player2.act(grid)
 
-            grid, end, winner = env.step(move, print_grid=False)
+            try:
+                grid, end, winner = env.step(move, print_grid=False)
+            except InvalidMoveError:
+                # If wrong move is played, penalize the player
+                end = True
+                winner = player1.player if env.current_player == player2.player else player2.player
 
             if end:
                 if hasattr(player1, 'end'):
