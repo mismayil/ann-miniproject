@@ -16,10 +16,10 @@ class ReplayMemory(object):
 
     def push(self, state, action, next_state=None, reward=0):
         """Save a transition"""
-        self.memory.append(Transition(state=torch.tensor(state),
-                                      action=torch.tensor(action),
-                                      next_state=torch.tensor(next_state) if next_state is not None else None,
-                                      reward=torch.tensor(reward)))
+        self.memory.append(Transition(state=state.clone(),
+                                      action=action.clone() if isinstance(action, torch.Tensor) else torch.tensor(action),
+                                      next_state=next_state.clone() if next_state is not None else None,
+                                      reward=reward.clone() if isinstance(reward, torch.Tensor) else torch.tensor(reward)))
 
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
@@ -169,14 +169,14 @@ class DeepQPlayer:
         # on the "older" target_net; selecting their best reward with max(1)[0].
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        next_state_values = torch.zeros(self.batch_size)
+        next_state_values = torch.zeros((self.batch_size, 1))
         if non_final_next_states is not None:
-            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0]
+            next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].view(-1, 1)
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
         # Compute Huber loss
-        loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+        loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
         loss.backward()
