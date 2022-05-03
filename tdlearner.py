@@ -3,6 +3,11 @@ import random
 from collections import defaultdict
 import numpy as np
 
+POLICY_EPS_GREEDY = "eps-greedy"
+METHOD_Q = "method-q"
+METHOD_SARSA = "method-sarsa"
+METHOD_EXP_SARSA = "method-exp-sarsa"
+
 class QState:
     def __init__(self, grid: np.ndarray, action: Union[int, Tuple[int, int]]):
         self.grid = grid
@@ -22,8 +27,8 @@ class QState:
         return f"state={self.state}, action={self.action}"
 
 
-class QPlayer:
-    def __init__(self, epsilon=0.2, alpha=0.05, gamma=0.99, player='X'):
+class TDPlayer:
+    def __init__(self, epsilon=0.2, alpha=0.05, gamma=0.99, player='X', policy=POLICY_EPS_GREEDY, method=METHOD_Q):
         self.epsilon = epsilon
         self.alpha = alpha
         self.gamma = gamma
@@ -31,6 +36,8 @@ class QPlayer:
         self.qvalues = defaultdict(int)
         self.last_qstate = None
         self.last_reward = 0
+        self.policy = policy
+        self.method = method
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
@@ -71,7 +78,26 @@ class QPlayer:
     def opponent(self):
         return 'X' if self.player == 'O' else 'O'
 
-    def end(self, winner):
+    def decide(self, grid):
+        if self.policy == POLICY_EPS_GREEDY:
+            if random.random() < self.epsilon:
+                return self.random(grid)
+            else:
+                return self.greedy(grid)
+
+        return self.random(grid)
+
+    def update(self, grid, reward=0, end=False):
+        next_value = 0
+
+        if not end:
+            if self.method == METHOD_Q:
+                next_value = self.qvalues[self.greedy(grid)]
+
+        if self.last_qstate:
+            self.qvalues[self.last_qstate] += self.alpha * (reward + self.gamma * next_value - self.qvalues[self.last_qstate])
+
+    def end(self, grid, winner):
         reward = 0
 
         if winner == self.player:
@@ -79,22 +105,12 @@ class QPlayer:
         elif winner == self.opponent():
             reward = -1
 
-        self.qvalues[self.last_qstate] += self.alpha * (reward - self.qvalues[self.last_qstate])
+        self.update(grid, reward=reward, end=True)
 
         self.last_qstate = None
 
-    def act(self, grid, **kwargs):
-        greedy_qstate = self.greedy(grid)
-
-        if random.random() < self.epsilon:
-            qstate = self.random(grid)
-        else:
-            qstate = greedy_qstate
-
-        if self.last_qstate:
-            # reward is 0
-            self.qvalues[self.last_qstate] += self.alpha * (self.gamma * self.qvalues[greedy_qstate] - self.qvalues[self.last_qstate])
-
+    def act(self, grid):
+        qstate = self.decide(grid)
+        self.update(grid)
         self.last_qstate = qstate
-
         return qstate.action

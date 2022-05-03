@@ -28,10 +28,10 @@ def play(player1, player2, episodes=5, debug=False):
 
             if end:
                 if hasattr(player1, 'end'):
-                    player1.end(winner)
+                    player1.end(grid, winner)
                 
                 if hasattr(player2, 'end'):
-                    player2.end(winner)
+                    player2.end(grid, winner)
 
                 if winner == player1.player:
                     player1_stats['wins'] += 1
