@@ -59,6 +59,7 @@ class DeepQPlayer:
         self.target_net.eval()
         self.last_state = None
         self.last_action = None
+        self.last_reward = 0
         self.num_games = 0
         self.target_update = target_update
         self.batch_size = batch_size
@@ -116,7 +117,7 @@ class DeepQPlayer:
             return prediction.item()
 
     def decide(self, grid):
-        epsilon = self.epsilon() if callable(self.epsilon) else self.epsilon
+        epsilon = self.epsilon(self.num_games) if callable(self.epsilon) else self.epsilon
         if random.random() > epsilon:
             return self.greedy(grid)
         return self.random(grid)
@@ -125,10 +126,11 @@ class DeepQPlayer:
         state = self.grid_to_state(grid)
         action = self.decide(grid)
         if self.last_state is not None:
-            self.memory.push(self.last_state, self.last_action, state, 0)
+            self.memory.push(self.last_state, self.last_action, state, self.last_reward)
         self.optimize()
         self.last_state = state
         self.last_action = action
+        self.last_reward = 0
         return action
 
     def end(self, grid, winner):
