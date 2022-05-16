@@ -2,7 +2,7 @@ import numpy as np
 from tic_env import TictactoeEnv, InvalidMoveError
 
 
-def play(player1, player2, episodes=5, debug=False):
+def play(player1, player2, episodes=5, debug=False, first_player="alternate"):
     env = TictactoeEnv()
     Turns = np.array(['X','O'])
     player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
@@ -11,7 +11,12 @@ def play(player1, player2, episodes=5, debug=False):
     for i in range(episodes):
         env.reset()
         grid, _, __ = env.observe()
-        Turns = Turns[np.random.permutation(2)]
+
+        if first_player == "alternate":
+            Turns = np.flip(Turns)
+        else:
+            Turns = Turns[np.random.permutation(2)]
+
         player1.set_player(Turns[0])
         player2.set_player(Turns[1])
 

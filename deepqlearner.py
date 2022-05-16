@@ -29,14 +29,14 @@ class ReplayMemory(object):
 
 
 class DeepQNetwork(nn.Module):
-    def __init__(self, in_dim=18, out_dim=9) -> None:
+    def __init__(self, in_dim=18, out_dim=9, hidden_dim=128) -> None:
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(in_dim, 128),
+            nn.Linear(in_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(128, out_dim)
+            nn.Linear(hidden_dim, out_dim)
         )
     
     def forward(self, x):
