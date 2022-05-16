@@ -33,7 +33,7 @@ class TDPlayer:
         self.alpha = alpha
         self.gamma = gamma
         self.player = player # 'X' or 'O'
-        self.qvalues = defaultdict(int)
+        self.qvalues = defaultdict(lambda:np.zeros((3,3)))
         self.last_qstate = None
         self.last_reward = 0
         self.policy = policy
@@ -49,29 +49,37 @@ class TDPlayer:
     def random(self, grid):
         """ Chose a random action from the available options. """
         avail = self.empty(grid)
-        return QStateAction(grid, avail[random.randint(0, len(avail)-1)])
+        random_int = random.randint(0, len(avail[0])-1)
+        random_action = (avail[0][random_int], avail[1][random_int])
+        return QStateAction(grid, random_action)
 
     def empty(self, grid):
         '''return all empty positions'''
-        avail = []
-        for i in range(9):
-            pos = (int(i/3), i % 3)
-            if grid[pos] == 0:
-                avail.append(pos)
-        return avail
+        return np.where(grid==0)
 
     def greedy(self, grid):
         '''choose next state greedily'''
         actions = self.empty(grid)
         best_qstate = None
-        max_qvalue = None
 
-        for action in actions:
-            qstate = QStateAction(grid, action)
-            qvalue = self.qvalues.get(qstate, 0)
-            if max_qvalue is None or qvalue > max_qvalue:
-                max_qvalue = qvalue
-                best_qstate = qstate
+        state = tuple(grid.ravel().tolist())
+        qvalues = self.qvalues.get(state, np.zeros((3,3)))
+        qvalues = qvalues[actions]
+        
+        max_val = np.max(qvalues)
+
+        best_action_id = np.random.choice(np.flatnonzero(qvalues == max_val))
+        best_action = (actions[0][best_action_id], actions[1][best_action_id])
+        best_qstate = QStateAction(grid, best_action)
+        
+        # print('grid', grid)
+        # print('state', state)
+        # print('actions', actions)
+        # print('qvalues', qvalues)
+        # print('max_val', max_val)
+        # print('flat', np.flatnonzero(qvalues == max_val))
+        # print('action_id', best_action_id)
+        # print('best_action', best_action)        
         
         return best_qstate
 
@@ -92,10 +100,11 @@ class TDPlayer:
 
         if not end:
             if self.method == METHOD_Q:
-                next_value = self.qvalues[self.greedy(grid)]
+                next_state = self.greedy(grid)
+                next_value = self.qvalues[next_state.state][next_state.action]
 
         if self.last_qstate:
-            self.qvalues[self.last_qstate] += self.alpha * (reward + self.gamma * next_value - self.qvalues[self.last_qstate])
+            self.qvalues[self.last_qstate.state][self.last_qstate.action] += self.alpha * (reward + self.gamma * next_value - self.qvalues[self.last_qstate.state][self.last_qstate.action])
 
     def end(self, grid, winner):
         reward = 0
