@@ -2,11 +2,13 @@ import numpy as np
 from tic_env import TictactoeEnv, InvalidMoveError
 
 
-def play(player1, player2, episodes=5, debug=False, first_player="alternate"):
+def play(player1, player2, episodes=5, debug=False, first_player="alternate", seed=None):
     env = TictactoeEnv()
     Turns = np.array(['X','O'])
     player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
     player2_stats = {'wins': 0, 'losses': 0, 'M': 0}
+    
+    if seed is not None: np.random.seed(seed)
 
     for i in range(episodes):
         env.reset()
