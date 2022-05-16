@@ -1,6 +1,6 @@
 import numpy as np
 from tic_env import TictactoeEnv, InvalidMoveError
-
+from tqdm import tqdm
 
 def play(player1, player2, episodes=5, debug=False, first_player="alternate"):
     env = TictactoeEnv()
@@ -8,7 +8,7 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate"):
     player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
     player2_stats = {'wins': 0, 'losses': 0, 'M': 0}
 
-    for i in range(episodes):
+    for i in tqdm(range(episodes)):
         env.reset()
         grid, _, __ = env.observe()
 

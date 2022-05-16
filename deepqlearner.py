@@ -48,7 +48,7 @@ class DeepQNetwork(nn.Module):
 
 
 class DeepQPlayer:
-    def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500, batch_size=64, learning_rate=5e-4) -> None:
+    def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500, batch_size=64, learning_rate=5e-4, log_every=250, debug=False) -> None:
         self.epsilon = epsilon
         self.gamma = gamma
         self.player = player
@@ -65,6 +65,12 @@ class DeepQPlayer:
         self.learning_rate = learning_rate
         self.criterion = nn.HuberLoss()
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
+        self.running_reward = 0
+        self.running_loss = 0
+        self.avg_rewards = []
+        self.avg_losses = []
+        self.log_every = log_every
+        self.debug = debug
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
@@ -110,7 +116,8 @@ class DeepQPlayer:
             return prediction.item()
 
     def decide(self, grid):
-        if random.random() > self.epsilon:
+        epsilon = self.epsilon() if callable(self.epsilon) else self.epsilon
+        if random.random() > epsilon:
             return self.greedy(grid)
         return self.random(grid)
 
@@ -134,9 +141,21 @@ class DeepQPlayer:
             reward = -1
 
         self.memory.push(self.last_state, self.last_action, None, reward)
-        self.optimize()
+        loss = self.optimize()
         self.last_state = None
         self.last_action = None
+
+        self.running_reward += reward
+
+        if loss is not None:
+            self.running_loss += loss
+
+        if (self.num_games+1) % self.log_every == 0:
+            self.avg_rewards.append(self.running_reward / self.log_every)
+            self.running_reward = 0
+
+            self.avg_losses.append(self.running_loss / self.log_every)
+            self.running_loss = 0
 
     def optimize(self):
         if len(self.memory) < self.batch_size:
@@ -185,7 +204,10 @@ class DeepQPlayer:
         self.optimizer.step()
 
         if self.num_games % self.target_update == 0:
-            print(f"num_games={self.num_games}, loss={loss.item()}")
+            if self.debug:
+                print(f"num_games={self.num_games}, loss={loss.item()}")
             self.target_net.load_state_dict(self.policy_net.state_dict())
+        
+        return loss.item()
 
 
