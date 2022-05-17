@@ -1,4 +1,5 @@
 import numpy as np
+import random
 from tic_env import TictactoeEnv, InvalidMoveError
 
 
@@ -8,7 +9,10 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", se
     player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
     player2_stats = {'wins': 0, 'losses': 0, 'M': 0}
     
-    if seed is not None: np.random.seed(seed)
+    if seed is not None: 
+        # Set a seed for reproducibility
+        np.random.seed(seed)
+        random.seed(seed)
 
     for i in range(episodes):
         env.reset()

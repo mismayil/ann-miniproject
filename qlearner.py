@@ -3,10 +3,6 @@ import random
 from collections import defaultdict
 import numpy as np
 
-POLICY_EPS_GREEDY = "eps-greedy"
-METHOD_Q = "method-q"
-METHOD_SARSA = "method-sarsa"
-METHOD_EXP_SARSA = "method-exp-sarsa"
 
 class QStateAction:
     def __init__(self, grid: np.ndarray, action: Union[int, Tuple[int, int]]):
@@ -27,8 +23,8 @@ class QStateAction:
         return f"state={self.state}, action={self.action}"
 
 
-class TDPlayer:
-    def __init__(self, epsilon=0.2, alpha=0.05, gamma=0.99, player='X', policy=POLICY_EPS_GREEDY, method=METHOD_Q):
+class QPlayer:
+    def __init__(self, epsilon=0.2, alpha=0.05, gamma=0.99, player='X'):
         self.epsilon = epsilon
         self.alpha = alpha
         self.gamma = gamma
@@ -37,11 +33,6 @@ class TDPlayer:
         self.last_qstate = None
         self.last_reward = 0
         
-        assert policy==POLICY_EPS_GREEDY, NotImplementedError()
-        assert method==METHOD_Q, NotImplementedError()
-        self.policy = policy
-        self.method = method
-
     def set_player(self, player = 'X', j=-1):
         self.player = player
         self.last_qstate = None
@@ -81,11 +72,10 @@ class TDPlayer:
         return 'X' if self.player == 'O' else 'O'
 
     def decide(self, grid):
-        if self.policy == POLICY_EPS_GREEDY:
-            if random.random() < self.epsilon:
-                return self.random(grid)
-            else:
-                return self.greedy(grid)
+        if random.random() < self.epsilon:
+            return self.random(grid)
+        else:
+            return self.greedy(grid)
 
         return self.random(grid)
 
@@ -93,8 +83,7 @@ class TDPlayer:
         next_value = 0
 
         if not end:
-            if self.method == METHOD_Q:
-                next_value = self.qvalues[self.greedy(grid)]
+            next_value = self.qvalues[self.greedy(grid)]
 
         if self.last_qstate:
             self.qvalues[self.last_qstate] += self.alpha * (reward + self.gamma * next_value - self.qvalues[self.last_qstate])
