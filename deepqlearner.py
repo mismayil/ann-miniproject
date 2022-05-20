@@ -6,6 +6,8 @@ import torch.optim as optim
 from pathlib import Path
 import json
 
+from utils import calculate_m_opt, calculate_m_rand
+
 VALUE_TO_PLAYER = {-1: 'O', 1: 'X', 0: None}
 
 Transition = namedtuple('Transition',
@@ -75,9 +77,14 @@ class DeepQPlayer:
         self.avg_losses = []
         self.log_every = log_every
         self.debug = debug
-        self.m_values = []
-        self.wins = 0
-        self.losses = 0
+        self.m_values = {"m_opt": [], "m_rand": []}
+        self.eval_mode = False
+
+    def eval(self):
+        self.eval_mode = True
+
+    def train(self):
+        self.eval_mode = False
 
     def save_pretrained(self, save_path):
         Path(save_path).mkdir(parents=True, exist_ok=True)
@@ -92,9 +99,10 @@ class DeepQPlayer:
     def from_pretrained(cls, load_path):
         config = json.loads(Path(load_path, "config.json").read_text())
         policy_net = torch.load(Path(load_path, "policy_net.pt"))
+        target_net = torch.load(Path(load_path, "target_net.pt"))
         player = cls(**config)
         player.policy_net.load_state_dict(policy_net)
-        player.target_net.load_state_dict(policy_net)
+        player.target_net.load_state_dict(target_net)
         player.avg_losses = config["avg_losses"]
         player.avg_rewards = config["avg_rewards"]
         player.m_values = config["m_values"]
@@ -145,53 +153,57 @@ class DeepQPlayer:
 
     def decide(self, grid):
         epsilon = self.epsilon(self.num_games) if callable(self.epsilon) else self.epsilon
-        if random.random() > epsilon:
+        if self.eval_mode or random.random() > epsilon:
             return self.greedy(grid)
         return self.random(grid)
 
     def act(self, grid):
         state = self.grid_to_state(grid)
         action = self.decide(grid)
-        if self.last_state is not None:
-            self.memory.push(self.last_state, self.last_action, state, self.last_reward)
-        self.optimize()
-        self.last_state = state
-        self.last_action = action
-        self.last_reward = 0
+
+        if not self.eval_mode:
+            if self.last_state is not None:
+                self.memory.push(self.last_state, self.last_action, state, self.last_reward)
+            self.optimize()
+            self.last_state = state
+            self.last_action = action
+            self.last_reward = 0
+
         return action
 
     def end(self, grid, winner):
-        self.num_games += 1
-        reward = 0
+        if not self.eval_mode:
+            self.num_games += 1
+            reward = 0
 
-        if winner == self.player:
-            self.wins += 1
-            reward = 1
-        elif winner == self.opponent():
-            self.losses += 1
-            reward = -1
+            if winner == self.player:
+                reward = 1
+            elif winner == self.opponent():
+                reward = -1
 
-        self.memory.push(self.last_state, self.last_action, None, reward)
-        loss = self.optimize()
+            self.memory.push(self.last_state, self.last_action, None, reward)
+            loss = self.optimize()
 
-        self.last_state = None
-        self.last_action = None
+            self.last_state = None
+            self.last_action = None
 
-        self.running_reward += reward
+            self.running_reward += reward
 
-        if loss is not None:
-            self.running_loss += loss
+            if loss is not None:
+                self.running_loss += loss
 
-        if (self.num_games+1) % self.log_every == 0:
-            self.avg_rewards.append(self.running_reward / self.log_every)
-            self.running_reward = 0
+            if (self.num_games+1) % self.log_every == 0:
+                self.avg_rewards.append(self.running_reward / self.log_every)
+                self.running_reward = 0
 
-            self.avg_losses.append(self.running_loss / self.log_every)
-            self.running_loss = 0
+                self.avg_losses.append(self.running_loss / self.log_every)
+                self.running_loss = 0
 
-            self.m_values.append((self.wins - self.losses) / self.log_every)
-            self.wins = 0
-            self.losses = 0
+                m_opt = calculate_m_opt(self)
+                m_rand = calculate_m_rand(self)
+
+                self.m_values["m_opt"].append(m_opt)
+                self.m_values["m_rand"].append(m_rand)
 
     def optimize(self):
         if len(self.memory) < self.batch_size:
