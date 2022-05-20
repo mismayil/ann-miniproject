@@ -3,6 +3,8 @@ import torch
 import random
 import torch.nn as nn
 import torch.optim as optim
+from pathlib import Path
+import json
 
 VALUE_TO_PLAYER = {-1: 'O', 1: 'X', 0: None}
 
@@ -72,6 +74,26 @@ class DeepQPlayer:
         self.avg_losses = []
         self.log_every = log_every
         self.debug = debug
+        self.m_values = []
+        self.wins = 0
+        self.losses = 0
+
+    def save_pretrained(self, save_path):
+        Path(save_path).mkdir(parents=True, exist_ok=True)
+        config = dict(epsilon=None if callable(self.epsilon) else self.epsilon, gamma=self.gamma, player=self.player, memory_capacity=len(self.memory),
+                      target_update=self.target_update, learning_rate=self.learning_rate, batch_size=self.batch_size,
+                      log_every=self.log_every, debug=self.debug)
+        Path(save_path, "config.json").write_text(json.dumps(config))
+        torch.save(self.policy_net.state_dict(), Path(save_path, "policy_net.pt"))
+
+    @classmethod
+    def from_pretrained(cls, load_path):
+        config = json.loads(Path(load_path, "config.json").read_text())
+        policy_net = torch.load(Path(load_path, "policy_net.pt"))
+        player = cls(**config)
+        player.policy_net.load_state_dict(policy_net)
+        player.target_net.load_state_dict(policy_net)
+        return player
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
@@ -138,12 +160,15 @@ class DeepQPlayer:
         reward = 0
 
         if winner == self.player:
+            self.wins += 1
             reward = 1
         elif winner == self.opponent():
+            self.losses += 1
             reward = -1
 
         self.memory.push(self.last_state, self.last_action, None, reward)
         loss = self.optimize()
+
         self.last_state = None
         self.last_action = None
 
@@ -158,6 +183,10 @@ class DeepQPlayer:
 
             self.avg_losses.append(self.running_loss / self.log_every)
             self.running_loss = 0
+
+            self.m_values.append((self.wins - self.losses) / self.log_every)
+            self.wins = 0
+            self.losses = 0
 
     def optimize(self):
         if len(self.memory) < self.batch_size:
