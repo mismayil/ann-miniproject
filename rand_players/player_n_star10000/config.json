@@ -1,0 +1,1 @@
+{"epsilon": null, "gamma": 0.99, "player": "O", "memory_capacity": 10000, "target_update": 500, "learning_rate": 0.0005, "batch_size": 64, "log_every": 250, "debug": false}

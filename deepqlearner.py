@@ -50,7 +50,8 @@ class DeepQNetwork(nn.Module):
 
 
 class DeepQPlayer:
-    def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500, batch_size=64, learning_rate=5e-4, log_every=250, debug=False) -> None:
+    def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500,
+                 batch_size=64, learning_rate=5e-4, log_every=250, debug=False, *args, **kwargs) -> None:
         self.epsilon = epsilon
         self.gamma = gamma
         self.player = player
@@ -82,9 +83,10 @@ class DeepQPlayer:
         Path(save_path).mkdir(parents=True, exist_ok=True)
         config = dict(epsilon=None if callable(self.epsilon) else self.epsilon, gamma=self.gamma, player=self.player, memory_capacity=len(self.memory),
                       target_update=self.target_update, learning_rate=self.learning_rate, batch_size=self.batch_size,
-                      log_every=self.log_every, debug=self.debug)
+                      log_every=self.log_every, debug=self.debug, avg_losses=self.avg_losses, avg_rewards=self.avg_rewards, m_values=self.m_values)
         Path(save_path, "config.json").write_text(json.dumps(config))
         torch.save(self.policy_net.state_dict(), Path(save_path, "policy_net.pt"))
+        torch.save(self.target_net.state_dict(), Path(save_path, "target_net.pt"))
 
     @classmethod
     def from_pretrained(cls, load_path):
@@ -93,6 +95,9 @@ class DeepQPlayer:
         player = cls(**config)
         player.policy_net.load_state_dict(policy_net)
         player.target_net.load_state_dict(policy_net)
+        player.avg_losses = config["avg_losses"]
+        player.avg_rewards = config["avg_rewards"]
+        player.m_values = config["m_values"]
         return player
 
     def set_player(self, player = 'X', j=-1):
