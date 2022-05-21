@@ -53,13 +53,14 @@ class DeepQNetwork(nn.Module):
 
 class DeepQPlayer:
     def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500,
-                 batch_size=64, learning_rate=5e-4, log_every=250, debug=False, *args, **kwargs) -> None:
+                 batch_size=64, learning_rate=5e-4, log_every=250, debug=False,
+                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, *args, **kwargs) -> None:
         self.epsilon = epsilon
         self.gamma = gamma
         self.player = player
-        self.memory = ReplayMemory(memory_capacity)
-        self.policy_net = DeepQNetwork()
-        self.target_net = DeepQNetwork()
+        self.memory = ReplayMemory(memory_capacity) if memory is None else memory
+        self.policy_net = DeepQNetwork() if policy_net is None else policy_net
+        self.target_net = DeepQNetwork() if target_net is None else target_net
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
         self.last_state = None
@@ -79,6 +80,8 @@ class DeepQPlayer:
         self.debug = debug
         self.m_values = {"m_opt": [], "m_rand": []}
         self.eval_mode = False
+        self.swap_state = swap_state
+        self.log = log
 
     def eval(self):
         self.eval_mode = True
@@ -146,6 +149,11 @@ class DeepQPlayer:
         
         return state
 
+    def maybe_swap_state(self, state):
+        if self.swap_state:
+            return state.flip(dims=[2])
+        return state
+
     def greedy(self, grid):
         with torch.no_grad():
             prediction = self.policy_net.predict(self.grid_to_state(grid).unsqueeze(0))
@@ -163,7 +171,7 @@ class DeepQPlayer:
 
         if not self.eval_mode:
             if self.last_state is not None:
-                self.memory.push(self.last_state, self.last_action, state, self.last_reward)
+                self.memory.push(self.maybe_swap_state(self.last_state), self.last_action, self.maybe_swap_state(state), self.last_reward)
             self.optimize()
             self.last_state = state
             self.last_action = action
@@ -181,29 +189,30 @@ class DeepQPlayer:
             elif winner == self.opponent():
                 reward = -1
 
-            self.memory.push(self.last_state, self.last_action, None, reward)
+            self.memory.push(self.maybe_swap_state(self.last_state), self.last_action, None, reward)
             loss = self.optimize()
 
             self.last_state = None
             self.last_action = None
 
-            self.running_reward += reward
+            if self.log:
+                self.running_reward += reward
 
-            if loss is not None:
-                self.running_loss += loss
+                if loss is not None:
+                    self.running_loss += loss
 
-            if (self.num_games+1) % self.log_every == 0:
-                self.avg_rewards.append(self.running_reward / self.log_every)
-                self.running_reward = 0
+                if (self.num_games+1) % self.log_every == 0:
+                    self.avg_rewards.append(self.running_reward / self.log_every)
+                    self.running_reward = 0
 
-                self.avg_losses.append(self.running_loss / self.log_every)
-                self.running_loss = 0
+                    self.avg_losses.append(self.running_loss / self.log_every)
+                    self.running_loss = 0
 
-                m_opt = calculate_m_opt(self)
-                m_rand = calculate_m_rand(self)
+                    m_opt = calculate_m_opt(self)
+                    m_rand = calculate_m_rand(self)
 
-                self.m_values["m_opt"].append(m_opt)
-                self.m_values["m_rand"].append(m_rand)
+                    self.m_values["m_opt"].append(m_opt)
+                    self.m_values["m_rand"].append(m_rand)
 
     def optimize(self):
         if len(self.memory) < self.batch_size:
