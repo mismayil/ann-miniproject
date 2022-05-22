@@ -1,9 +1,8 @@
 import numpy as np
-import random
-from tic_env import TictactoeEnv, InvalidMoveError
+from tic_env import TictactoeEnv, InvalidMoveError, OptimalPlayer
+from tqdm import tqdm
 
-
-def play(player1, player2, episodes=5, debug=False, first_player="alternate", seed=None):
+def play(player1, player2, episodes=5, debug=False, first_player="alternate", disable_tqdm=False, seed=None):
     env = TictactoeEnv()
     Turns = np.array(['X','O'])
     player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
@@ -14,7 +13,7 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", se
         np.random.seed(seed)
         random.seed(seed)
 
-    for i in range(episodes):
+    for i in tqdm(range(episodes), disable=disable_tqdm):
         env.reset()
         grid, _, __ = env.observe()
 
@@ -77,3 +76,18 @@ def print_qstate(qstate):
     env.grid = qstate.grid
     env.render()
     print(f"Next action: {qstate.action}")
+
+
+def calculate_m_opt(q_player, episodes=500):
+    q_player.eval()
+    optimal_player = OptimalPlayer(epsilon=0.0)
+    player1_stats, _ = play(q_player, optimal_player, episodes=episodes, debug=False, first_player='alternate', disable_tqdm=True)
+    q_player.train()
+    return player1_stats['M']
+
+def calculate_m_rand(q_player, episodes=500):
+    q_player.eval()
+    random_player = OptimalPlayer(epsilon=1.0)
+    player1_stats, _ = play(q_player, random_player, episodes=episodes, debug=False, first_player='alternate', disable_tqdm=True)
+    q_player.train()
+    return player1_stats['M']

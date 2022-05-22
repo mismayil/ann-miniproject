@@ -3,6 +3,10 @@ import torch
 import random
 import torch.nn as nn
 import torch.optim as optim
+from pathlib import Path
+import json
+
+from utils import calculate_m_opt, calculate_m_rand
 
 VALUE_TO_PLAYER = {-1: 'O', 1: 'X', 0: None}
 
@@ -48,23 +52,64 @@ class DeepQNetwork(nn.Module):
 
 
 class DeepQPlayer:
-    def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500, batch_size=64, learning_rate=5e-4) -> None:
+    def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500,
+                 batch_size=64, learning_rate=5e-4, log_every=250, debug=False,
+                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, *args, **kwargs) -> None:
         self.epsilon = epsilon
         self.gamma = gamma
         self.player = player
-        self.memory = ReplayMemory(memory_capacity)
-        self.policy_net = DeepQNetwork()
-        self.target_net = DeepQNetwork()
+        self.memory = ReplayMemory(memory_capacity) if memory is None else memory
+        self.policy_net = DeepQNetwork() if policy_net is None else policy_net
+        self.target_net = DeepQNetwork() if target_net is None else target_net
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
         self.last_state = None
         self.last_action = None
+        self.last_reward = 0
         self.num_games = 0
         self.target_update = target_update
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.criterion = nn.HuberLoss()
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=learning_rate)
+        self.running_reward = 0
+        self.running_loss = 0
+        self.avg_rewards = []
+        self.avg_losses = []
+        self.log_every = log_every
+        self.debug = debug
+        self.m_values = {"m_opt": [], "m_rand": []}
+        self.eval_mode = False
+        self.swap_state = swap_state
+        self.log = log
+
+    def eval(self):
+        self.eval_mode = True
+
+    def train(self):
+        self.eval_mode = False
+
+    def save_pretrained(self, save_path):
+        Path(save_path).mkdir(parents=True, exist_ok=True)
+        config = dict(epsilon=None if callable(self.epsilon) else self.epsilon, gamma=self.gamma, player=self.player, memory_capacity=len(self.memory),
+                      target_update=self.target_update, learning_rate=self.learning_rate, batch_size=self.batch_size,
+                      log_every=self.log_every, debug=self.debug, avg_losses=self.avg_losses, avg_rewards=self.avg_rewards, m_values=self.m_values)
+        Path(save_path, "config.json").write_text(json.dumps(config))
+        torch.save(self.policy_net.state_dict(), Path(save_path, "policy_net.pt"))
+        torch.save(self.target_net.state_dict(), Path(save_path, "target_net.pt"))
+
+    @classmethod
+    def from_pretrained(cls, load_path):
+        config = json.loads(Path(load_path, "config.json").read_text())
+        policy_net = torch.load(Path(load_path, "policy_net.pt"))
+        target_net = torch.load(Path(load_path, "target_net.pt"))
+        player = cls(**config)
+        player.policy_net.load_state_dict(policy_net)
+        player.target_net.load_state_dict(target_net)
+        player.avg_losses = config["avg_losses"]
+        player.avg_rewards = config["avg_rewards"]
+        player.m_values = config["m_values"]
+        return player
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
@@ -104,39 +149,70 @@ class DeepQPlayer:
         
         return state
 
+    def maybe_swap_state(self, state):
+        if self.swap_state:
+            return state.flip(dims=[2])
+        return state
+
     def greedy(self, grid):
         with torch.no_grad():
             prediction = self.policy_net.predict(self.grid_to_state(grid).unsqueeze(0))
             return prediction.item()
 
     def decide(self, grid):
-        if random.random() > self.epsilon:
+        epsilon = self.epsilon(self.num_games) if callable(self.epsilon) else self.epsilon
+        if self.eval_mode or random.random() > epsilon:
             return self.greedy(grid)
         return self.random(grid)
 
     def act(self, grid):
         state = self.grid_to_state(grid)
         action = self.decide(grid)
-        if self.last_state is not None:
-            self.memory.push(self.last_state, self.last_action, state, 0)
-        self.optimize()
-        self.last_state = state
-        self.last_action = action
+
+        if not self.eval_mode:
+            if self.last_state is not None:
+                self.memory.push(self.maybe_swap_state(self.last_state), self.last_action, self.maybe_swap_state(state), self.last_reward)
+            self.optimize()
+            self.last_state = state
+            self.last_action = action
+            self.last_reward = 0
+
         return action
 
     def end(self, grid, winner):
-        self.num_games += 1
-        reward = 0
+        if not self.eval_mode:
+            self.num_games += 1
+            reward = 0
 
-        if winner == self.player:
-            reward = 1
-        elif winner == self.opponent():
-            reward = -1
+            if winner == self.player:
+                reward = 1
+            elif winner == self.opponent():
+                reward = -1
 
-        self.memory.push(self.last_state, self.last_action, None, reward)
-        self.optimize()
-        self.last_state = None
-        self.last_action = None
+            self.memory.push(self.maybe_swap_state(self.last_state), self.last_action, None, reward)
+            loss = self.optimize()
+
+            self.last_state = None
+            self.last_action = None
+
+            if self.log:
+                self.running_reward += reward
+
+                if loss is not None:
+                    self.running_loss += loss
+
+                if (self.num_games+1) % self.log_every == 0:
+                    self.avg_rewards.append(self.running_reward / self.log_every)
+                    self.running_reward = 0
+
+                    self.avg_losses.append(self.running_loss / self.log_every)
+                    self.running_loss = 0
+
+                    m_opt = calculate_m_opt(self)
+                    m_rand = calculate_m_rand(self)
+
+                    self.m_values["m_opt"].append(m_opt)
+                    self.m_values["m_rand"].append(m_rand)
 
     def optimize(self):
         if len(self.memory) < self.batch_size:
@@ -185,7 +261,10 @@ class DeepQPlayer:
         self.optimizer.step()
 
         if self.num_games % self.target_update == 0:
-            print(f"num_games={self.num_games}, loss={loss.item()}")
+            if self.debug:
+                print(f"num_games={self.num_games}, loss={loss.item()}")
             self.target_net.load_state_dict(self.policy_net.state_dict())
+        
+        return loss.item()
 
 
