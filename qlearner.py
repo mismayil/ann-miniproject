@@ -2,6 +2,7 @@ from typing import Union, Tuple
 import random
 from collections import defaultdict
 import numpy as np
+from utils import calculate_m_opt, calculate_m_rand
 
 
 class QStateAction:
@@ -24,7 +25,7 @@ class QStateAction:
 
 
 class QPlayer:
-    def __init__(self, epsilon=0.2, alpha=0.05, gamma=0.99, player='X'):
+    def __init__(self, epsilon=0.01, alpha=0.05, gamma=0.99, player='X', log_every=250, test_every=None, *args, **kwargs):
         self.epsilon = epsilon
         self.alpha = alpha
         self.gamma = gamma
@@ -32,6 +33,20 @@ class QPlayer:
         self.qvalues = defaultdict(int)
         self.last_qstate = None
         self.last_reward = 0
+        self.num_games = 0
+        self.running_reward = 0
+        self.running_win = 0
+        self.running_loss = 0
+        self.avg_rewards = []
+        self.avg_wins = []
+        self.avg_losses = []
+        self.m_values = {"m_opt": [], "m_rand": []}
+        self.log_every = log_every
+        self.log = False if log_every is None or log_every <=0 else True
+        self.test_every = test_every
+        self.test = False if test_every is None or log_every <=0 else True
+        self.eval_mode = False
+        
         
     def set_player(self, player = 'X', j=-1):
         self.player = player
@@ -39,6 +54,12 @@ class QPlayer:
         self.last_reward = 0
         if j != -1:
             self.player = 'X' if j % 2 == 0 else 'O'
+            
+    def eval(self):
+        self.eval_mode = True
+
+    def train(self):
+        self.eval_mode = False
 
     def random(self, grid):
         """ Chose a random action from the available options. """
@@ -72,12 +93,10 @@ class QPlayer:
         return 'X' if self.player == 'O' else 'O'
 
     def decide(self, grid):
-        if random.random() < self.epsilon:
+        epsilon = self.epsilon(self.num_games) if callable(self.epsilon) else self.epsilon
+        if self.eval_mode or random.random() < epsilon:
             return self.random(grid)
-        else:
-            return self.greedy(grid)
-
-        return self.random(grid)
+        return self.greedy(grid)
 
     def update(self, grid, reward=0, end=False):
         next_value = 0
@@ -89,16 +108,43 @@ class QPlayer:
             self.qvalues[self.last_qstate] += self.alpha * (reward + self.gamma * next_value - self.qvalues[self.last_qstate])
 
     def end(self, grid, winner):
-        reward = 0
+        if self.eval_mode: return
+        
+        self.num_games += 1
+        reward, win, loss = 0, 0, 0
 
         if winner == self.player:
-            reward = 1
+            reward, win, loss = 1, 1, 0
         elif winner == self.opponent():
-            reward = -1
+            reward, win, loss = -1, 0, 1
 
         self.update(grid, reward=reward, end=True)
 
         self.last_qstate = None
+        
+        if self.log:
+            self.running_win += win
+            self.running_loss += loss
+            self.running_reward += reward
+            
+            if (self.num_games+1) % self.log_every == 0:
+                self.avg_wins.append(self.running_win / self.log_every)
+                self.running_win = 0
+                
+                self.avg_losses.append(self.running_loss / self.log_every)
+                self.running_loss = 0
+                
+                self.avg_rewards.append(self.running_reward / self.log_every)
+                self.running_reward = 0
+                
+        if self.test:
+            if  (self.num_games+1) % self.test_every == 0:
+                m_opt = calculate_m_opt(self)
+                m_rand = calculate_m_rand(self)
+
+                self.m_values["m_opt"].append(m_opt)
+                self.m_values["m_rand"].append(m_rand)
+                
 
     def act(self, grid):
         qstate = self.decide(grid)

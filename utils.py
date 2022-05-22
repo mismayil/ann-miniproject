@@ -1,6 +1,7 @@
 import numpy as np
 from tic_env import TictactoeEnv, InvalidMoveError, OptimalPlayer
-from tqdm import tqdm
+from tqdm.notebook import tqdm
+import random
 
 def play(player1, player2, episodes=5, debug=False, first_player="alternate", disable_tqdm=False, seed=None):
     env = TictactoeEnv()
@@ -79,15 +80,15 @@ def print_qstate(qstate):
 
 
 def calculate_m_opt(q_player, episodes=500):
-    q_player.eval()
+    if hasattr(q_player, 'eval'): q_player.eval()
     optimal_player = OptimalPlayer(epsilon=0.0)
     player1_stats, _ = play(q_player, optimal_player, episodes=episodes, debug=False, first_player='alternate', disable_tqdm=True)
-    q_player.train()
+    if hasattr(q_player, 'train'): q_player.train()
     return player1_stats['M']
 
 def calculate_m_rand(q_player, episodes=500):
-    q_player.eval()
+    if hasattr(q_player, 'eval'): q_player.eval()
     random_player = OptimalPlayer(epsilon=1.0)
     player1_stats, _ = play(q_player, random_player, episodes=episodes, debug=False, first_player='alternate', disable_tqdm=True)
-    q_player.train()
+    if hasattr(q_player, 'train'): q_player.train()
     return player1_stats['M']
