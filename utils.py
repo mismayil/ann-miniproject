@@ -2,11 +2,16 @@ import numpy as np
 from tic_env import TictactoeEnv, InvalidMoveError, OptimalPlayer
 from tqdm import tqdm
 
-def play(player1, player2, episodes=5, debug=False, first_player="alternate", disable_tqdm=False):
+def play(player1, player2, episodes=5, debug=False, first_player="alternate", disable_tqdm=False, seed=None):
     env = TictactoeEnv()
     Turns = np.array(['X','O'])
     player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
     player2_stats = {'wins': 0, 'losses': 0, 'M': 0}
+    
+    if seed is not None: 
+        # Set a seed for reproducibility
+        np.random.seed(seed)
+        random.seed(seed)
 
     for i in tqdm(range(episodes), disable=disable_tqdm):
         env.reset()
