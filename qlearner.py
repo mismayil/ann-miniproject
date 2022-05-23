@@ -148,6 +148,6 @@ class QPlayer:
 
     def act(self, grid):
         qstate = self.decide(grid)
-        self.update(grid)
+        if not self.eval_mode: self.update(grid)
         self.last_qstate = qstate
         return qstate.action
