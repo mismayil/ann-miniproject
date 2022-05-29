@@ -85,19 +85,24 @@ class DeepQPlayer:
         self.swap_state = swap_state
         self.log = log
         self.wandb_name = wandb_name
+        self.wandb_run = None
 
-        if self.wandb_name is not None:
+        if self.log and self.wandb_name is not None:
             import wandb
-            wandb.init(project="ann-project", name=wandb_name,
-                       config={"epsilon": epsilon, "gamma": gamma, "player": player, "memory_capacity": memory_capacity,
-                               "target_update": target_update, "batch_size": batch_size, "learning_rate": learning_rate,
-                               "log_every": log_every, "debug": debug, "swap_state": swap_state, "log": log})
+            self.wandb_run = wandb.init(project="ann-project", name=wandb_name, reinit=True,
+                                        config={"epsilon": epsilon, "gamma": gamma, "player": player, "memory_capacity": memory_capacity,
+                                                "target_update": target_update, "batch_size": batch_size, "learning_rate": learning_rate,
+                                                "log_every": log_every, "debug": debug, "swap_state": swap_state, "log": log})
 
     def eval(self):
         self.eval_mode = True
 
     def train(self):
         self.eval_mode = False
+
+    def finish_run(self):
+        if self.wandb_run:
+            self.wandb_run.finish()
 
     def save_pretrained(self, save_path):
         Path(save_path).mkdir(parents=True, exist_ok=True)
@@ -166,7 +171,7 @@ class DeepQPlayer:
 
     def greedy(self, grid):
         with torch.no_grad():
-            prediction = self.policy_net.predict(self.grid_to_state(grid).unsqueeze(0))
+            prediction = self.policy_net.predict(self.grid_to_state(grid).unsqueeze(0).to(DEVICE))
             return prediction.item()
 
     def decide(self, grid):
@@ -240,10 +245,11 @@ class DeepQPlayer:
         # Compute a mask of non-final states and concatenate the batch elements
         # (a final state would've been the one after which simulation ended)
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
-                                            batch.next_state)), dtype=torch.bool)
+                                            batch.next_state)), dtype=torch.bool).to(DEVICE)
         non_final_next_states = [s for s in batch.next_state if s is not None]
+
         if non_final_next_states:
-            non_final_next_states = torch.stack(non_final_next_states)
+            non_final_next_states = torch.stack(non_final_next_states).to(DEVICE)
         else:
             non_final_next_states = None
 
@@ -261,7 +267,8 @@ class DeepQPlayer:
         # on the "older" target_net; selecting their best reward with max(1)[0].
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
-        next_state_values = torch.zeros((self.batch_size, 1))
+        next_state_values = torch.zeros((self.batch_size, 1)).to(DEVICE)
+
         if non_final_next_states is not None:
             next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].view(-1, 1)
         # Compute the expected Q values
@@ -272,8 +279,6 @@ class DeepQPlayer:
 
         self.optimizer.zero_grad()
         loss.backward()
-        for param in self.policy_net.parameters():
-            param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
 
         if self.num_games % self.target_update == 0:

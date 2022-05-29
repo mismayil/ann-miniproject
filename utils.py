@@ -1,6 +1,6 @@
 import numpy as np
 from tic_env import TictactoeEnv, InvalidMoveError, OptimalPlayer
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import random
 
 def play(player1, player2, episodes=5, debug=False, first_player="alternate", disable_tqdm=False, seed=None):

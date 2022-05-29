@@ -1,0 +1,7 @@
+ipykernel
+ipywidgets
+numpy
+torch
+wandb
+matplotlib
+tqdm
