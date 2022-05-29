@@ -25,12 +25,12 @@ class QStateAction:
 
 
 class QPlayer:
-    def __init__(self, epsilon=0.01, alpha=0.05, gamma=0.99, player='X', log_every=250, test_every=None, *args, **kwargs):
+    def __init__(self, epsilon=0.01, alpha=0.05, gamma=0.99, player='X', log_every=250, test_every=None, qvalues=None, *args, **kwargs):
         self.epsilon = epsilon
         self.alpha = alpha
         self.gamma = gamma
         self.player = player # 'X' or 'O'
-        self.qvalues = defaultdict(int)
+        self.qvalues = defaultdict(int) if qvalues is None else qvalues
         self.last_qstate = None
         self.last_reward = 0
         self.num_games = 0
@@ -94,9 +94,9 @@ class QPlayer:
 
     def decide(self, grid):
         epsilon = self.epsilon(self.num_games) if callable(self.epsilon) else self.epsilon
-        if self.eval_mode or random.random() < epsilon:
-            return self.random(grid)
-        return self.greedy(grid)
+        if self.eval_mode or random.random() > epsilon:
+            return self.greedy(grid)
+        return self.random(grid)
 
     def update(self, grid, reward=0, end=False):
         next_value = 0
