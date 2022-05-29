@@ -13,6 +13,8 @@ VALUE_TO_PLAYER = {-1: 'O', 1: 'X', 0: None}
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class ReplayMemory(object):
     def __init__(self, capacity):
@@ -54,13 +56,13 @@ class DeepQNetwork(nn.Module):
 class DeepQPlayer:
     def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500,
                  batch_size=64, learning_rate=5e-4, log_every=250, debug=False,
-                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, *args, **kwargs) -> None:
+                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, wandb_name=None, *args, **kwargs) -> None:
         self.epsilon = epsilon
         self.gamma = gamma
         self.player = player
         self.memory = ReplayMemory(memory_capacity) if memory is None else memory
-        self.policy_net = DeepQNetwork() if policy_net is None else policy_net
-        self.target_net = DeepQNetwork() if target_net is None else target_net
+        self.policy_net = DeepQNetwork().to(DEVICE) if policy_net is None else policy_net.to(DEVICE)
+        self.target_net = DeepQNetwork().to(DEVICE) if target_net is None else target_net.to(DEVICE)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
         self.last_state = None
@@ -82,6 +84,14 @@ class DeepQPlayer:
         self.eval_mode = False
         self.swap_state = swap_state
         self.log = log
+        self.wandb_name = wandb_name
+
+        if self.wandb_name is not None:
+            import wandb
+            wandb.init(project="ann-project", name=wandb_name,
+                       config={"epsilon": epsilon, "gamma": gamma, "player": player, "memory_capacity": memory_capacity,
+                               "target_update": target_update, "batch_size": batch_size, "learning_rate": learning_rate,
+                               "log_every": log_every, "debug": debug, "swap_state": swap_state, "log": log})
 
     def eval(self):
         self.eval_mode = True
@@ -202,10 +212,12 @@ class DeepQPlayer:
                     self.running_loss += loss
 
                 if (self.num_games+1) % self.log_every == 0:
-                    self.avg_rewards.append(self.running_reward / self.log_every)
+                    avg_reward = self.running_reward / self.log_every
+                    self.avg_rewards.append(avg_reward)
                     self.running_reward = 0
 
-                    self.avg_losses.append(self.running_loss / self.log_every)
+                    avg_loss = self.running_loss / self.log_every
+                    self.avg_losses.append(avg_loss)
                     self.running_loss = 0
 
                     m_opt = calculate_m_opt(self)
@@ -213,6 +225,10 @@ class DeepQPlayer:
 
                     self.m_values["m_opt"].append(m_opt)
                     self.m_values["m_rand"].append(m_rand)
+
+                    if self.wandb_name is not None:
+                        import wandb
+                        wandb.log({"avg_reward": avg_reward, "avg_loss": avg_loss, "m_opt": m_opt, "m_rand": m_rand})
 
     def optimize(self):
         if len(self.memory) < self.batch_size:
@@ -231,9 +247,9 @@ class DeepQPlayer:
         else:
             non_final_next_states = None
 
-        state_batch = torch.stack(batch.state)
-        action_batch = torch.stack(batch.action).view(-1, 1)
-        reward_batch = torch.stack(batch.reward).view(-1, 1)
+        state_batch = torch.stack(batch.state).to(DEVICE)
+        action_batch = torch.stack(batch.action).view(-1, 1).to(DEVICE)
+        reward_batch = torch.stack(batch.reward).view(-1, 1).to(DEVICE)
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
@@ -251,7 +267,7 @@ class DeepQPlayer:
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.gamma) + reward_batch
 
-        # Compute Huber loss
+        # Compute loss
         loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
@@ -266,5 +282,3 @@ class DeepQPlayer:
             self.target_net.load_state_dict(self.policy_net.state_dict())
         
         return loss.item()
-
-
