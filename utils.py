@@ -47,10 +47,10 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", di
 
             if end:
                 if hasattr(player1, 'end'):
-                    player1.end(grid, winner, invalid_move=(invalid_player==player1))
+                    player1.end(grid, winner, invalid_move=(invalid_player==player1.player))
                 
                 if hasattr(player2, 'end'):
-                    player2.end(grid, winner, invalid_move=(invalid_player==player2))
+                    player2.end(grid, winner, invalid_move=(invalid_player==player2.player))
 
                 if winner == player1.player:
                     player1_stats['wins'] += 1
@@ -71,6 +71,13 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", di
     
     player1_stats['M'] = (player1_stats['wins'] - player1_stats['losses']) / episodes
     player2_stats['M'] = (player2_stats['wins'] - player2_stats['losses']) / episodes
+
+    if hasattr(player1, 'finish_run'):
+        player1.finish_run()
+
+    if hasattr(player2, 'finish_run'):
+        player2.finish_run()
+
     return player1_stats, player2_stats
 
 

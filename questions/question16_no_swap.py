@@ -15,4 +15,3 @@ for eps in epsilons:
     q_player2 = DeepQPlayer(epsilon=eps, target_update=500, batch_size=64, log=False,
                             policy_net=policy_net, target_net=target_net, memory=memory)
     play(q_player1, q_player2, episodes=20000)
-    q_player1.finish_run()

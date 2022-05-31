@@ -107,7 +107,7 @@ class QPlayer:
         if self.last_qstate:
             self.qvalues[self.last_qstate] += self.alpha * (reward + self.gamma * next_value - self.qvalues[self.last_qstate])
 
-    def end(self, grid, winner):
+    def end(self, grid, winner, *args, **kwargs):
         if self.eval_mode: return
         
         self.num_games += 1

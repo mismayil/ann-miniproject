@@ -13,4 +13,3 @@ for n_star in n_stars:
     optimal_player = OptimalPlayer(epsilon=0.5)
     q_player = DeepQPlayer(epsilon=lambda n, n_star=n_star: max(EPS_MIN, EPS_MAX * (1 - n / n_star)), target_update=500, log_every=250, wandb_name=f"q13_nstar{n_star}")
     play(optimal_player, q_player, episodes=20000)
-    q_player.finish_run()

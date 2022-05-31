@@ -101,7 +101,7 @@ class DeepQPlayer:
         self.eval_mode = False
 
     def finish_run(self):
-        if self.wandb_run:
+        if not self.eval_mode and self.wandb_run:
             self.wandb_run.finish()
 
     def save_pretrained(self, save_path):

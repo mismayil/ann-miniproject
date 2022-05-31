@@ -17,4 +17,3 @@ for n_star in n_stars:
     q_player2 = DeepQPlayer(epsilon=lambda n, n_star=n_star: max(EPS_MIN, EPS_MAX * (1 - n / n_star)), target_update=500, batch_size=64, log=False,
                             policy_net=policy_net, target_net=target_net, memory=memory, swap_state=True)
     play(q_player1, q_player2, episodes=20000)
-    q_player1.finish_run()
