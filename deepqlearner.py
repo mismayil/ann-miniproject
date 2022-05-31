@@ -194,14 +194,14 @@ class DeepQPlayer:
 
         return action
 
-    def end(self, grid, winner):
+    def end(self, grid, winner, invalid_move=False):
         if not self.eval_mode:
             self.num_games += 1
             reward = 0
 
             if winner == self.player:
                 reward = 1
-            elif winner == self.opponent():
+            elif winner == self.opponent() or invalid_move:
                 reward = -1
 
             self.memory.push(self.maybe_swap_state(self.last_state), self.last_action, None, reward)

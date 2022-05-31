@@ -17,6 +17,7 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", di
     for i in tqdm(range(episodes), disable=disable_tqdm):
         env.reset()
         grid, _, __ = env.observe()
+        invalid_player = None
 
         if first_player == "alternate":
             Turns = np.flip(Turns)
@@ -41,14 +42,15 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", di
             except InvalidMoveError:
                 # If wrong move is played, penalize the player
                 end = True
-                winner = player1.player if env.current_player == player2.player else player2.player
+                invalid_player = player1.player if env.current_player == player1.player else player2.player
+                winner = None
 
             if end:
                 if hasattr(player1, 'end'):
-                    player1.end(grid, winner)
+                    player1.end(grid, winner, invalid_move=(invalid_player==player1))
                 
                 if hasattr(player2, 'end'):
-                    player2.end(grid, winner)
+                    player2.end(grid, winner, invalid_move=(invalid_player==player2))
 
                 if winner == player1.player:
                     player1_stats['wins'] += 1
