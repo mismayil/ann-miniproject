@@ -56,7 +56,7 @@ class DeepQNetwork(nn.Module):
 class DeepQPlayer:
     def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500,
                  batch_size=64, learning_rate=5e-4, log_every=250, debug=False,
-                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, wandb_name=None, *args, **kwargs) -> None:
+                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, wandb_name=None, do_optimize=True, *args, **kwargs) -> None:
         self.epsilon = epsilon
         self.gamma = gamma
         self.player = player
@@ -86,6 +86,7 @@ class DeepQPlayer:
         self.log = log
         self.wandb_name = wandb_name
         self.wandb_run = None
+        self.do_optimize = do_optimize
 
         if self.log and self.wandb_name is not None:
             import wandb
@@ -187,10 +188,13 @@ class DeepQPlayer:
         if not self.eval_mode:
             if self.last_state is not None:
                 self.memory.push(self.maybe_swap_state(self.last_state), self.last_action, self.maybe_swap_state(state), self.last_reward)
-            self.optimize()
-            self.last_state = state
-            self.last_action = action
-            self.last_reward = 0
+            
+            if self.do_optimize:
+                self.optimize()
+
+        self.last_state = state
+        self.last_action = action
+        self.last_reward = 0
 
         return action
 
@@ -205,7 +209,9 @@ class DeepQPlayer:
                 reward = -1
 
             self.memory.push(self.maybe_swap_state(self.last_state), self.last_action, None, reward)
-            loss = self.optimize()
+
+            if self.do_optimize:
+                loss = self.optimize()
 
             self.last_state = None
             self.last_action = None
