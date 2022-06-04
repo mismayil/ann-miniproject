@@ -129,7 +129,8 @@ class DeepQPlayer:
 
     def set_player(self, player = 'X', j=-1):
         self.player = player
-        self.last_qstate = None
+        self.last_state = None
+        self.last_action = None
         self.last_reward = 0
         if j != -1:
             self.player = 'X' if j % 2 == 0 else 'O'

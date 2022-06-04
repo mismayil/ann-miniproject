@@ -4,7 +4,7 @@ sys.path.append("..")
 from utils import play
 from deepqlearner import DeepQPlayer, ReplayMemory, DeepQNetwork
 
-epsilons = [0.001, 0.01, 0.1, 0.2]
+epsilons = [0.001, 0.01, 0.1, 0.2, 0.3, 0.5]
 
 for eps in epsilons:
     memory = ReplayMemory(10000)
