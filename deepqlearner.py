@@ -117,8 +117,8 @@ class DeepQPlayer:
     @classmethod
     def from_pretrained(cls, load_path):
         config = json.loads(Path(load_path, "config.json").read_text())
-        policy_net = torch.load(Path(load_path, "policy_net.pt"))
-        target_net = torch.load(Path(load_path, "target_net.pt"))
+        policy_net = torch.load(Path(load_path, "policy_net.pt"), map_location=DEVICE)
+        target_net = torch.load(Path(load_path, "target_net.pt"), map_location=DEVICE)
         player = cls(**config)
         player.policy_net.load_state_dict(policy_net)
         player.target_net.load_state_dict(target_net)
