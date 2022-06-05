@@ -1,9 +1,25 @@
 import numpy as np
-from tic_env import TictactoeEnv, InvalidMoveError, OptimalPlayer
+from tic_env import TictactoeEnv, OptimalPlayer
 from tqdm import tqdm
 import random
 
+
 def play(player1, player2, episodes=5, debug=False, first_player="alternate", disable_tqdm=False, seed=None):
+    """Play Tic Tact Toe between two players
+
+    Args:
+        player1: Player 1
+        player2: Player 2
+        episodes (int, optional): Number of episodes. Defaults to 5.
+        debug (bool, optional): Whether to print debug messages. Defaults to False.
+        first_player (str, optional): Strategy to determine first player. Defaults to "alternate".
+            "alternate" means alternate between player1 and player2 every game. Otherwise, randomly determined.
+        disable_tqdm (bool, optional): Whether to disable progress bar. Defaults to False.
+        seed (_type_, optional): Random seed. Defaults to None.
+
+    Returns:
+        (dict, dict): Player 1 stats and Player 2 stats (M-values)
+    """
     env = TictactoeEnv()
     Turns = np.array(['X','O'])
     player1_stats = {'wins': 0, 'losses': 0, 'M': 0}
@@ -39,7 +55,7 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", di
 
             try:
                 grid, end, winner = env.step(move, print_grid=False)
-            except InvalidMoveError:
+            except ValueError:
                 # If wrong move is played, penalize the player
                 end = True
                 invalid_player = player1.player if env.current_player == player1.player else player2.player
@@ -81,23 +97,65 @@ def play(player1, player2, episodes=5, debug=False, first_player="alternate", di
     return player1_stats, player2_stats
 
 
-def print_qstate(qstate):
-    env = TictactoeEnv()
-    env.grid = qstate.grid
-    env.render()
-    print(f"Next action: {qstate.action}")
-
-
 def calculate_m_opt(q_player, episodes=500):
-    if hasattr(q_player, 'eval'): q_player.eval()
+    """Calculate M_opt for a given player
+
+    Args:
+        q_player: Player
+        episodes (int, optional): Number of episodes. Defaults to 500.
+
+    Returns:
+        float: M_opt value
+    """
+    # Put player in evaluation mode to avoid training and logging
+    if hasattr(q_player, 'eval'): 
+        q_player.eval()
+
     optimal_player = OptimalPlayer(epsilon=0.0)
     player1_stats, _ = play(q_player, optimal_player, episodes=episodes, debug=False, first_player='alternate', disable_tqdm=True)
-    if hasattr(q_player, 'train'): q_player.train()
+
+    # Put player back in training mode
+    if hasattr(q_player, 'train'): 
+        q_player.train()
+
     return player1_stats['M']
 
 def calculate_m_rand(q_player, episodes=500):
-    if hasattr(q_player, 'eval'): q_player.eval()
+    """Calculate M_rand for a given player
+
+    Args:
+        q_player: Player
+        episodes (int, optional): Number of episodes. Defaults to 500.
+
+    Returns:
+        float: M_rand value
+    """
+    # Put player in evaluation mode to avoid training and logging
+    if hasattr(q_player, 'eval'): 
+        q_player.eval()
+
     random_player = OptimalPlayer(epsilon=1.0)
     player1_stats, _ = play(q_player, random_player, episodes=episodes, debug=False, first_player='alternate', disable_tqdm=True)
-    if hasattr(q_player, 'train'): q_player.train()
+
+    # Put player back in training mode
+    if hasattr(q_player, 'train'): 
+        q_player.train()
+
     return player1_stats['M']
+
+def save_stats(players, path):
+    """ Save player stats to a file"""
+    player_stats = []
+    
+    for player in players:
+        
+        stat = {
+            'loss': player.avg_losses if hasattr(player, 'avg_losses') else None,
+            'reward': player.avg_rewards,
+            'm_opt': player.m_values['m_opt'],
+            'm_rand': player.m_values['m_rand']
+        }
+        player_stats.append(stat)
+        
+    with open(path, 'wb') as npy:
+        np.save(npy, player_stats)

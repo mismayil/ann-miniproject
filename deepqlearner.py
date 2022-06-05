@@ -27,7 +27,8 @@ class ReplayMemory(object):
                                       next_state=next_state.clone() if next_state is not None else None,
                                       reward=reward.clone() if isinstance(reward, torch.Tensor) else torch.tensor(reward)))
 
-    def sample(self, batch_size):
+    def sample(self, batch_size=64):
+        """ Sample a batch of transitions """
         return random.sample(self.memory, batch_size)
 
     def __len__(self):
@@ -56,7 +57,27 @@ class DeepQNetwork(nn.Module):
 class DeepQPlayer:
     def __init__(self, epsilon=0.1, gamma=0.99, player='X', memory_capacity=10000, target_update=500,
                  batch_size=64, learning_rate=5e-4, log_every=250, debug=False,
-                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, wandb_name=None, do_optimize=True, *args, **kwargs) -> None:
+                 policy_net=None, target_net=None, memory=None, swap_state=False, log=True, wandb_name=None, do_optimize=True, *args, **kwargs):
+        """Initialize a Deep Q-learning player
+
+        Args:
+            epsilon (float, optional): Epsilon value. Defaults to 0.1.
+            gamma (float, optional): Gamma value. Defaults to 0.99.
+            player (str, optional): Player symbol. Defaults to 'X'.
+            memory_capacity (int, optional): Replay memory capacity. Defaults to 10000.
+            target_update (int, optional): Update frequency for target network. Defaults to 500.
+            batch_size (int, optional): Batch size. Defaults to 64.
+            learning_rate (float, optional): Learning rate. Defaults to 5e-4.
+            log_every (int, optional): Logging frequency. Defaults to 250.
+            debug (bool, optional): Whether print debug messages. Defaults to False.
+            policy_net (nn.Module, optional): Shared policy network. Defaults to None.
+            target_net (nn.Module, optional): Shared target network. Defaults to None.
+            memory (ReplayMemory, optional): Shared replay memory. Defaults to None.
+            swap_state (bool, optional): Whether to swap state before saving to memory. Defaults to False.
+            log (bool, optional): Whether to log metrics. Defaults to True.
+            wandb_name (str, optional): Wandb run name. Defaults to None.
+            do_optimize (bool, optional): Whether to optimize the policy network. Defaults to True.
+        """
         self.epsilon = epsilon
         self.gamma = gamma
         self.player = player
@@ -96,16 +117,25 @@ class DeepQPlayer:
                                                 "log_every": log_every, "debug": debug, "swap_state": swap_state, "log": log})
 
     def eval(self):
+        """
+        Set the player to evaluation mode.
+        In this mode, the player will not explore and will only use the policy network to make decisions.
+        """
         self.eval_mode = True
 
     def train(self):
+        """ Set the player to training mode. """
         self.eval_mode = False
 
     def finish_run(self):
+        """
+        Finish wandb run if present and in training mode.
+        """
         if not self.eval_mode and self.wandb_run:
             self.wandb_run.finish()
 
     def save_pretrained(self, save_path):
+        """ Save a pretrained model. """
         Path(save_path).mkdir(parents=True, exist_ok=True)
         config = dict(epsilon=None if callable(self.epsilon) else self.epsilon, gamma=self.gamma, player=self.player, memory_capacity=len(self.memory),
                       target_update=self.target_update, learning_rate=self.learning_rate, batch_size=self.batch_size,
@@ -116,9 +146,10 @@ class DeepQPlayer:
 
     @classmethod
     def from_pretrained(cls, load_path):
+        """ Load a pretrained model. """
         config = json.loads(Path(load_path, "config.json").read_text())
-        policy_net = torch.load(Path(load_path, "policy_net.pt"), map_location=DEVICE)
-        target_net = torch.load(Path(load_path, "target_net.pt"), map_location=DEVICE)
+        policy_net = torch.load(Path(load_path, "policy_net.pt"))
+        target_net = torch.load(Path(load_path, "target_net.pt"))
         player = cls(**config)
         player.policy_net.load_state_dict(policy_net)
         player.target_net.load_state_dict(target_net)
@@ -136,7 +167,7 @@ class DeepQPlayer:
             self.player = 'X' if j % 2 == 0 else 'O'
 
     def empty(self, grid):
-        '''return all empty positions'''
+        """ Return all empty positions in the grid. """
         avail = []
         for i in range(9):
             pos = (int(i/3), i % 3)
@@ -150,9 +181,11 @@ class DeepQPlayer:
         return avail[random.randint(0, len(avail)-1)]
 
     def opponent(self):
+        """ Return the opponent of the player. """
         return 'X' if self.player == 'O' else 'O'
 
     def grid_to_state(self, grid):
+        """ Convert the grid to a state. """
         state = torch.zeros((3, 3, 2))
 
         for i in range(len(grid)):
@@ -167,22 +200,26 @@ class DeepQPlayer:
         return state
 
     def maybe_swap_state(self, state):
+        """ Swap the state if necessary. """
         if self.swap_state:
             return state.flip(dims=[2])
         return state
 
     def greedy(self, grid):
+        """ Return the best action according to the current policy network. """
         with torch.no_grad():
             prediction = self.policy_net.predict(self.grid_to_state(grid).unsqueeze(0).to(DEVICE))
             return prediction.item()
 
     def decide(self, grid):
+        """ Decide on an action. """
         epsilon = self.epsilon(self.num_games) if callable(self.epsilon) else self.epsilon
         if self.eval_mode or random.random() > epsilon:
             return self.greedy(grid)
         return self.random(grid)
 
     def act(self, grid):
+        """ Act on the grid. """
         state = self.grid_to_state(grid)
         action = self.decide(grid)
 
@@ -200,6 +237,7 @@ class DeepQPlayer:
         return action
 
     def end(self, grid, winner, invalid_move=False):
+        """ End callback of the game. """
         if not self.eval_mode:
             self.num_games += 1
             reward = 0
@@ -243,6 +281,7 @@ class DeepQPlayer:
                         wandb.log({"avg_reward": avg_reward, "avg_loss": avg_loss, "m_opt": m_opt, "m_rand": m_rand})
 
     def optimize(self):
+        """ Optimize the policy network. """
         if len(self.memory) < self.batch_size:
             return
 
