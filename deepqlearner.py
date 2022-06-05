@@ -17,7 +17,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ReplayMemory(object):
-    def __init__(self, capacity):
+    def __init__(self, capacity=10000):
         self.memory = deque([], maxlen=capacity)
 
     def push(self, state, action, next_state=None, reward=0):
