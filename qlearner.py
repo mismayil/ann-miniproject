@@ -25,7 +25,7 @@ class QStateAction:
 
 
 class QPlayer:
-    def __init__(self, epsilon=0.01, alpha=0.05, gamma=0.99, player='X', log_every=250, test_every=None, qvalues=None, *args, **kwargs):
+    def __init__(self, epsilon=0.01, alpha=0.05, gamma=0.99, player='X', log_every=250, test_every=None, qvalues=None, wandb_name=None, *args, **kwargs):
         self.epsilon = epsilon
         self.alpha = alpha
         self.gamma = gamma
@@ -46,6 +46,14 @@ class QPlayer:
         self.test_every = test_every
         self.test = False if test_every is None or log_every <=0 else True
         self.eval_mode = False
+        self.wandb_name = wandb_name
+        self.wandb_run = None
+
+        if self.log and self.wandb_name is not None:
+            import wandb
+            self.wandb_run = wandb.init(project="ann-project", name=wandb_name, reinit=True,
+                                        config={"epsilon": epsilon, "gamma": gamma, "player": player,
+                                                "log_every": log_every, "test_every": test_every, "alpha": alpha})
         
         
     def set_player(self, player = 'X', j=-1):
@@ -60,6 +68,10 @@ class QPlayer:
 
     def train(self):
         self.eval_mode = False
+
+    def finish_run(self):
+        if not self.eval_mode and self.wandb_run:
+            self.wandb_run.finish()
 
     def random(self, grid):
         """ Chose a random action from the available options. """
@@ -131,11 +143,17 @@ class QPlayer:
                 self.avg_wins.append(self.running_win / self.log_every)
                 self.running_win = 0
                 
-                self.avg_losses.append(self.running_loss / self.log_every)
+                avg_loss = self.running_loss / self.log_every
+                self.avg_losses.append(avg_loss)
                 self.running_loss = 0
                 
-                self.avg_rewards.append(self.running_reward / self.log_every)
+                avg_reward = self.running_reward / self.log_every
+                self.avg_rewards.append(avg_reward)
                 self.running_reward = 0
+
+                if self.wandb_name is not None:
+                    import wandb
+                    wandb.log({"avg_reward": avg_reward, "avg_loss": avg_loss})
                 
         if self.test:
             if  (self.num_games+1) % self.test_every == 0:
@@ -144,6 +162,10 @@ class QPlayer:
 
                 self.m_values["m_opt"].append(m_opt)
                 self.m_values["m_rand"].append(m_rand)
+
+                if self.wandb_name is not None:
+                    import wandb
+                    wandb.log({"m_opt": m_opt, "m_rand": m_rand})
                 
 
     def act(self, grid):
