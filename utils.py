@@ -159,3 +159,38 @@ def save_stats(players, path):
         
     with open(path, 'wb') as npy:
         np.save(npy, player_stats)
+
+
+def fetch_from_wandb(id_list):
+    """ Fetch player stats from wandb"""
+    import wandb
+    api = wandb.Api()
+
+    player_stats = []
+
+    for run_id in id_list:
+        run = api.run(f"mismayil/ann-project/{run_id}")
+        history = run.scan_history()
+
+        avg_reward, avg_loss, m_opt, m_rand = [], [], [], []
+        for row in history:
+            reward = row.get('avg_reward')
+            if reward is not None: avg_reward.append(reward)
+                
+            loss = row.get('avg_loss')
+            if loss is not None: avg_loss.append(loss)
+                
+            opt = row.get('m_opt')
+            if opt is not None: m_opt.append(opt)
+
+            rand = row.get('m_rand')
+            if rand is not None: m_rand.append(rand)
+
+        player_stats.append({
+            'reward': avg_reward,
+            'loss': avg_loss,
+            'm_opt': m_opt,
+            'm_rand': m_rand
+        })
+        
+    return player_stats

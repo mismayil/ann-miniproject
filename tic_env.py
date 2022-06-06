@@ -3,30 +3,20 @@ import numpy as np
 import random
 
 
-class InvalidMoveError(Exception):
-    pass
-
-
 class TictactoeEnv:
     '''
     Description:
         Classical Tic-tac-toe game for two players who take turns marking the spaces in a three-by-three grid with X or O.
         The player who succeeds in placing three of their marks in a horizontal, vertical, or diagonal row is the winner.
-
         The game is played by two players: player 'X' and player 'O'. Player 'x' moves first.
-
         The grid is represented by a 3x3 numpy array, with value in {0, 1, -1}, with corresponding values:
             0 - place unmarked
             1 - place marked with X
             -1 - place marked with O
-
         The game environment will recieve movement from two players in turn and update the grid.
-
     self.step:
         recieve the movement of the player, update the grid
-
     The action space is [0-8], representing the 9 positions on the grid.
-
     The reward is 1 if you win the game, -1 if you lose, and 0 besides.
     '''
 
@@ -62,9 +52,9 @@ class TictactoeEnv:
         elif type(position) is not tuple:
             position = tuple(position)
         if self.grid[position] != 0:
-            raise InvalidMoveError('There is already a piece on position {}.'.format(position))
+            raise ValueError('There is already a chess on position {}.'.format(position))
 
-        # place a piece on the position
+        # place a chess on the position
         self.grid[position] = self.player2value[self.current_player]
         # update
         self.num_step += 1
@@ -139,18 +129,15 @@ class OptimalPlayer:
     '''
     Description:
         A class to implement an epsilon-greedy optimal player in Tic-tac-toe.
-
     About optimial policy:
         There exists an optimial policy for game Tic-tac-toe. A player ('X' or 'O') can win or at least draw with optimial strategy.
         See the wikipedia page for details https://en.wikipedia.org/wiki/Tic-tac-toe
         In short, an optimal player choose the first available move from the following list:
             [Win, BlockWin, Fork, BlockFork, Center, Corner, Side]
-
     Parameters:
         epsilon: float, in [0, 1]. This is a value between 0-1 that indicates the
             probability of making a random action instead of the optimal action
             at any given time.
-
     '''
     def __init__(self, epsilon=0.2, player='X'):
         self.epsilon = epsilon

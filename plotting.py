@@ -65,6 +65,40 @@ def plot_m_values(stats_path, labels, test_every=250, save_path=None):
     
     if save_path is not None: fig.savefig(save_path, format='pdf')
 
+def plot_rewards_and_losses(stats_path, labels, log_every=250, save_path=None):
+    try:
+        with open(stats_path, 'rb') as npy:
+            player_stats = np.load(npy, allow_pickle=True)
+    except:
+        print('File not found!')
+        raise
+
+    fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+
+    game_ids = list(range(0, len(player_stats[0]['reward'])*log_every, log_every))
+    for i, player in enumerate(player_stats):
+        label = labels[i]
+        axes[0].plot(game_ids, player['reward'], label=label)
+        axes[1].plot(game_ids, player['loss'], label=label)
+    
+    axes[0].set_title(f'Average reward per {log_every} games', fontsize=20, fontweight='bold')
+    axes[0].set_xlabel('Game', fontsize=16)
+    axes[0].set_ylabel('Reward', fontsize=16)
+    axes[0].set_xlim([0, len(game_ids)*log_every])
+    axes[0].legend(loc='lower right')
+    axes[0].grid()
+    
+    axes[1].set_title(f'Average loss per {log_every} games', fontsize=20, fontweight='bold')
+    axes[1].set_xlabel('Game', fontsize=16)
+    axes[1].set_ylabel('Loss', fontsize=16)
+    axes[1].set_xlim([0, len(game_ids)*log_every])
+    axes[1].legend(loc='lower right')
+    axes[1].grid()
+
+    plt.show()
+    
+    if save_path is not None: fig.savefig(save_path, format='pdf')
+
 def read_grid(grid):
     empty = list(zip(*np.where(grid==0)))
     filled = list(zip(*np.where(grid!=0)))
