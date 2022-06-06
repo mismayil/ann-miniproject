@@ -143,6 +143,10 @@ def calculate_m_rand(q_player, episodes=500):
 
     return player1_stats['M']
 
+def read_stats(path):
+    with open(path, 'rb') as npy:
+        return np.load(npy, allow_pickle=True)
+
 def save_stats(players, path):
     """ Save player stats to a file"""
     player_stats = []
@@ -194,3 +198,13 @@ def fetch_from_wandb(id_list):
         })
         
     return player_stats
+
+def highest_m_values(stats):
+    highest_m_opts = []
+    highest_m_rands = []
+
+    for stat in stats:
+        highest_m_opts.append(max(stat['m_opt']))
+        highest_m_rands.append(max(stat['m_rand']))
+    
+    return {'m_opt': max(highest_m_opts), 'm_rand': max(highest_m_rands)}
